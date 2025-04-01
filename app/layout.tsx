@@ -1,7 +1,7 @@
 import type React from "react"
 import "./globals.css"
 import Navigation from "@/components/navigation"
-import { Listings } from "@/components/listings-provider"
+import { ListingsProvider } from "@/components/listings-provider"
 
 export const metadata = {
   title: "BPHC Buy & Sell",
@@ -23,7 +23,7 @@ export default function RootLayout({
         <div className="particle"></div>
         <div className="particle"></div>
 
-        <Listings>
+        <ListingsProvider>
           <Navigation />
           <main className="container">{children}</main>
           <footer>
@@ -31,7 +31,7 @@ export default function RootLayout({
               <p>&copy; {new Date().getFullYear()} Powered by ACM</p>
             </div>
           </footer>
-        </Listings>
+        </ListingsProvider>
       </body>
     </html>
   )

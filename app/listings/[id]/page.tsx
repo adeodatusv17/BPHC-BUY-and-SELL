@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { useListings } from "@/components/listings-provider"
+import { supabase } from "@/lib/supabase"
 import type { Listing } from "@/types/listing"
 import { ArrowLeft, Package, ShoppingCart, Calendar, Phone, Trash2, AlertTriangle } from "lucide-react"
 import Link from "next/link"
@@ -10,51 +10,91 @@ import Link from "next/link"
 export default function ListingDetail() {
   const params = useParams()
   const router = useRouter()
-  const { listings, deleteListing } = useListings()
   const [listing, setListing] = useState<Listing | null>(null)
   const [showContact, setShowContact] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   useEffect(() => {
-    if (params.id && listings.length > 0) {
-      setIsLoading(true)
-      const found = listings.find((item) => item.id === params.id)
-      if (found) {
-        setListing(found)
-      } else {
-        router.push("/")
-      }
-      setIsLoading(false)
-    }
-  }, [params.id, listings, router])
+    async function fetchListing() {
+      const listingId = params.id as string // Ensure id is a string
 
-  const handleDelete = () => {
-    if (listing) {
-      deleteListing(listing.id)
+      if (listingId) {
+        setIsLoading(true)
+        const { data, error } = await supabase
+          .from("listings")
+          .select("*")
+          .eq("id", listingId)
+          .single()
+
+        if (error) {
+          console.error("Error fetching listing:", error)
+          router.replace("/") 
+        } else {
+          const listingWithDateObject = {
+            ...data,
+            created_at: new Date(data.created_at)
+          };
+          setListing(listingWithDateObject);
+        }
+        setIsLoading(false)
+      }
+    }
+
+    fetchListing()
+  }, [params.id, router])
+
+  const handleDelete = async () => {
+    if (!listing?.id) return
+
+    try {
+      const { error } = await supabase
+        .from("listings")
+        .delete()
+        .eq("id", listing.id)
+
+      if (error) throw error
+
       setShowDeleteModal(false)
       router.push("/")
+    } catch (error) {
+      console.error("Error deleting listing:", error)
+      alert("Failed to delete listing. Please try again.")
     }
   }
 
-  if (isLoading) {
-    return <div className="loading">Loading listing details...</div>
-  }
+  if (isLoading) return <p>Loading...</p>
+  if (!listing) return <p>Listing not found.</p>
 
-  if (!listing) {
-    return <div className="loading">Listing not found</div>
-  }
 
-  const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+  const getOrdinalSuffix = (day: number): string => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
     }
-    return new Date(dateString).toLocaleDateString(undefined, options)
-  }
+  };
+  
+
+  const formatDate = (date: Date): string => {
+    const day = date.getDate();
+    const ordinal = getOrdinalSuffix(day);
+    
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    const formattedHours = hours % 12 || 12;
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    
+    return `${day}${ordinal} ${month} ${year} at ${formattedHours}:${formattedMinutes} ${ampm}`;
+  };
+  
+  
 
   return (
     <>
@@ -81,7 +121,7 @@ export default function ListingDetail() {
             <span className="listing-price">₹{listing.price.toFixed(2)}</span>
             <span className="listing-date">
               <Calendar size={16} />
-              {formatDate(listing.createdAt)}
+              {formatDate(listing.created_at)}
             </span>
           </div>
         </div>
@@ -95,7 +135,7 @@ export default function ListingDetail() {
           <div className="listing-contact">
             <h2>Contact Information</h2>
             <p>
-              Posted by: <strong>{listing.contactName}</strong>
+              Posted by: <strong>{listing.contact_name}</strong>
             </p>
 
             {!showContact ? (
@@ -106,7 +146,7 @@ export default function ListingDetail() {
               <div className="contact-details">
                 <p>
                   <Phone size={18} />
-                  {listing.contactPhone}
+                  {listing.contact_number}
                 </p>
               </div>
             )}

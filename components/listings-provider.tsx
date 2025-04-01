@@ -1,61 +1,88 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { supabase } from "../lib/supabase"
 import type { Listing } from "@/types/listing"
 
 interface ListingsContextType {
   listings: Listing[]
-  addListing: (listing: Listing) => void
-  deleteListing: (id: string) => void
+  addListing: (listing: Omit<Listing, "id" | "created_at">) => Promise<void>
+  deleteListing: (id: string) => Promise<void>
+  searchQuery: string
+  setSearchQuery: (query: string) => void
+  filterCategory: string
+  setFilterCategory: (category: string) => void
+  sortOption: string
+  setSortOption: (option: string) => void
 }
 
 const ListingsContext = createContext<ListingsContextType | undefined>(undefined)
 
-export function Listings({ children }: { children: ReactNode }) {
+export function ListingsProvider({ children }: { children: ReactNode }) {
   const [listings, setListings] = useState<Listing[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filterCategory, setFilterCategory] = useState("all")
+  const [sortOption, setSortOption] = useState("latest")
 
-  // Load listings from localStorage on mount
   useEffect(() => {
-    const savedListings = localStorage.getItem("listings")
-    if (savedListings) {
-      try {
-        setListings(JSON.parse(savedListings))
-      } catch (error) {
-        console.error("Failed to parse listings from localStorage", error)
-      }
-    }
+    fetchListings()
   }, [])
 
-  // Save listings to localStorage when they change
-  useEffect(() => {
-    if (listings.length > 0) {
-      localStorage.setItem("listings", JSON.stringify(listings))
-    }
-  }, [listings])
-
-  const addListing = (listing: Listing) => {
-    setListings((prev) => [listing, ...prev])
+  async function fetchListings() {
+    const { data, error } = await supabase
+      .from('listings')
+      .select('*')
+    if (error) console.error('Error fetching listings:', error)
+    else setListings(data || [])
   }
 
-  const deleteListing = (id: string) => {
-    setListings((prev) => {
-      const updated = prev.filter((listing) => listing.id !== id)
-      // If we deleted all listings, clear localStorage
-      if (updated.length === 0) {
-        localStorage.removeItem("listings")
-      }
-      return updated
+  const addListing = async (listing: Omit<Listing, "id" | "created_at">) => {
+    const { data, error } = await supabase
+      .from('listings')
+      .insert([{ ...listing, created_at: new Date().toISOString() }])
+      .select()
+    if (error) console.error('Error adding listing:', error)
+    else if (data) setListings(prev => [data[0], ...prev])
+  }
+
+  const deleteListing = async (id: string) => {
+    const { error } = await supabase
+      .from('listings')
+      .delete()
+      .eq('id', id)
+    if (error) console.error('Error deleting listing:', error)
+    else setListings(prev => prev.filter(listing => listing.id !== id))
+  }
+
+  const filteredAndSortedListings = listings
+    .filter((listing) =>
+      searchQuery === "" || listing.title.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .filter((listing) =>
+      filterCategory === "all" || listing.category === filterCategory
+    )
+    .sort((a, b) => {
+      if (sortOption === "price-low") return a.price - b.price
+      if (sortOption === "price-high") return b.price - a.price
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime() // Latest by default
     })
-  }
 
-  return <ListingsContext.Provider value={{ listings, addListing, deleteListing }}>{children}</ListingsContext.Provider>
+  return (
+    <ListingsContext.Provider value={{
+      listings, addListing, deleteListing,
+      searchQuery, setSearchQuery,
+      filterCategory, setFilterCategory,
+      sortOption, setSortOption
+    }}>
+      {children}
+    </ListingsContext.Provider>
+  )
 }
 
-export function useListings() {
+export const useListings = () => {
   const context = useContext(ListingsContext)
   if (context === undefined) {
     throw new Error("useListings must be used within a ListingsProvider")
   }
   return context
 }
-
