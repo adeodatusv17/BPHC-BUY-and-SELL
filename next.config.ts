@@ -1,7 +1,12 @@
-import type { NextConfig } from "next";
+// next.config.js
+const supabaseHostname = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    domains: [supabaseHostname],
+  },
+  // ... other config
+}
 
-export default nextConfig;
+module.exports = nextConfig
