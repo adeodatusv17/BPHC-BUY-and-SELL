@@ -2,6 +2,7 @@ import type React from "react"
 import "./globals.css"
 import Navigation from "@/components/navigation"
 import { ListingsProvider } from "@/components/listings-provider"
+import { AuthProvider } from "../components/authProvider" 
 
 export const metadata = {
   title: "BPHC Buy & Sell",
@@ -22,7 +23,7 @@ export default function RootLayout({
         <div className="particle"></div>
         <div className="particle"></div>
         <div className="particle"></div>
-
+        <AuthProvider>
         <ListingsProvider>
           <Navigation />
           <main className="container">{children}</main>
@@ -32,6 +33,7 @@ export default function RootLayout({
             </div>
           </footer>
         </ListingsProvider>
+        </AuthProvider>
       </body>
     </html>
   )
